@@ -13,8 +13,19 @@ import pandas as pd
 from joblib import dump, load
 
 jump = pd.read_csv('baseline_jump.csv')
-stand = pd.read_csv('stand_baseline.csv')
+stand_baseline = pd.read_csv('stand_baseline.csv')
 
+stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
+
+signal_mpu = stand_baseline
+
+new_data = pd.DataFrame([{'Ax1': 5.5, 'Ay1': 9.5, 'Az1': 5.5}])
+
+# Adicionando a nova linha ao DataFrame
+signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
+signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
+
+print(signal_mpu)
 
 def step_features(df):
 
@@ -67,15 +78,9 @@ class StepFeaturesTransformer(BaseEstimator, TransformerMixin):
 
 pipeline = load('pipeline.joblib')
 
-predicts = []
-
-predicts.append(pipeline.predict(jump)) 
-
-predicts.append(pipeline.predict(stand)) 
-
-print(predicts)
 
 def monitor_mqtt_messages(broker, topic):
+    
     try:
         print(f"Conectando ao broker {broker} e monitorando o tópico '{topic}'...")
         
