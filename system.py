@@ -19,13 +19,13 @@ stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
 
 signal_mpu = stand_baseline
 
-new_data = pd.DataFrame([{'Ax1': 5.5, 'Ay1': 9.5, 'Az1': 5.5}])
+# new_data = pd.DataFrame([{'Ax1': 5.5, 'Ay1': 9.5, 'Az1': 5.5}])
 
-# Adicionando a nova linha ao DataFrame
-signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
-signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
+# # Adicionando a nova linha ao DataFrame
+# signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
+# signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
 
-print(signal_mpu)
+# print(signal_mpu)
 
 def step_features(df):
 
@@ -82,6 +82,13 @@ pipeline = load('pipeline.joblib')
 def monitor_mqtt_messages(broker, topic):
     
     try:
+
+        jump = pd.read_csv('baseline_jump.csv')
+        stand_baseline = pd.read_csv('stand_baseline.csv')
+
+        stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
+
+        signal_mpu = stand_baseline
         print(f"Conectando ao broker {broker} e monitorando o tópico '{topic}'...")
         
         # Executa o mosquitto_sub como subprocesso
@@ -94,8 +101,18 @@ def monitor_mqtt_messages(broker, topic):
 
         # Lê mensagens em tempo real
         for line in iter(process.stdout.readline, ""):
-            print(f"{line.strip()}")
-    
+            acc = f"{line.strip()}"
+            acc = acc.split(",")
+
+            new_data = pd.DataFrame([{'Ax1': float(acc[0]), 'Ay1': float(acc[1]), 'Az1': float(acc[2])}])
+
+            # Adicionando a nova linha ao DataFrame
+            signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
+            signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
+
+            pred = pipeline.predict(signal_mpu)
+            print(pred)
+            
     except KeyboardInterrupt:
         print("\nEncerrando monitoramento...")
         process.terminate()
