@@ -3,6 +3,7 @@
 #  pip install pandas
 # pip install tensorflow
 
+import numpy as np
 
 import subprocess
 from sklearn.preprocessing import StandardScaler
@@ -99,6 +100,7 @@ def monitor_mqtt_messages(broker, topic):
             text=True
         )
 
+        count = 0
         # Lê mensagens em tempo real
         for line in iter(process.stdout.readline, ""):
             acc = f"{line.strip()}"
@@ -110,9 +112,15 @@ def monitor_mqtt_messages(broker, topic):
             signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
             signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
 
+            count += 1  
             pred = pipeline.predict(signal_mpu)
-            print(pred)
             
+
+            print(np.argmax(pred[0]))
+            print(count)
+
+            # signal_mpu = stand_baseline
+
     except KeyboardInterrupt:
         print("\nEncerrando monitoramento...")
         process.terminate()
