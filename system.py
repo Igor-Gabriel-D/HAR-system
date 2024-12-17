@@ -113,11 +113,16 @@ def monitor_mqtt_messages(broker, topic):
             signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
 
             count += 1  
-            pred = pipeline.predict(signal_mpu)
             
+            if count < 6:
+              pred = pipeline.predict(signal_mpu)
+              print(np.argmax(pred[0]))
+              res = np.argmax(pred[0])
+              count = 0
 
-            print(np.argmax(pred[0]))
-            print(count)
+              subprocess.run(["mosquitto_pub", "-h", "172.167.200.134", "-t", "/mov", "-m", f"{res}"])
+
+            # print(count)
 
             # signal_mpu = stand_baseline
 
@@ -134,6 +139,8 @@ if __name__ == "__main__":
     topic_name = "/teste"           
 
     monitor_mqtt_messages(broker_address, topic_name)
+
+
 
 
 
