@@ -3,6 +3,8 @@
 #  pip install pandas
 # pip install tensorflow
 
+from collections import Counter
+
 import numpy as np
 
 import subprocess
@@ -13,12 +15,14 @@ import pandas as pd
 
 from joblib import dump, load
 
-jump = pd.read_csv('baseline_jump.csv')
-stand_baseline = pd.read_csv('stand_baseline.csv')
+from time import sleep
 
-stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
+# jump = pd.read_csv('baseline_jump.csv')
+# stand_baseline = pd.read_csv('stand_baseline.csv')
 
-signal_mpu = stand_baseline
+# stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
+
+# signal_mpu = stand_baseline
 
 # new_data = pd.DataFrame([{'Ax1': 5.5, 'Ay1': 9.5, 'Az1': 5.5}])
 
@@ -30,31 +34,31 @@ signal_mpu = stand_baseline
 
 def step_features(df):
 
-  df = df.iloc[:(df.shape[0] // 25)*25]
+  df = df.iloc[:(df.shape[0] // 10)*10]
 
   # df = df.iloc[:25]
 
   transformed_df = None
 
   # aaaaaaa, faz um for para concatenar de 25 em 25 linhas, divide em sub dataframes e concatena tudo depois
-  for i in range(df.shape[0] // 25):
+  for i in range(df.shape[0] // 10):
 
-    split_df = df.iloc[ 25*i:25*(i+1) ]
+    split_df = df.iloc[ 10*i:10*(i+1) ]
 
     column_copy_x = split_df[['Ax1']].copy()
     shifted_df = column_copy_x
-    for j in range(2,26):
+    for j in range(2,11):
       shifted_df[f"Ax{j}"] = shifted_df[f"Ax{j-1}"].shift(periods=1)
 
 
     column_copy_y = split_df[['Ay1']].copy()
     shifted_df['Ay1'] = column_copy_y
-    for j in range(2,26):
+    for j in range(2,11):
       shifted_df[f"Ay{j}"] = shifted_df[f"Ay{j-1}"].shift(periods=1)
 
     column_copy_z = df[['Az1']].copy()
     shifted_df['Az1'] = column_copy_z
-    for j in range(2,26):
+    for j in range(2,11):
       shifted_df[f"Az{j}"] = shifted_df[f"Az{j-1}"].shift(periods=1)
 
 
@@ -84,7 +88,7 @@ def monitor_mqtt_messages(broker, topic):
     
     try:
 
-        jump = pd.read_csv('baseline_jump.csv')
+        jump = pd.read_csv('jump_baseline.csv')
         stand_baseline = pd.read_csv('stand_baseline.csv')
 
         stand_baseline = stand_baseline[['Ax1', 'Ay1', 'Az1']]
@@ -101,30 +105,45 @@ def monitor_mqtt_messages(broker, topic):
         )
 
         count = 0
+        jump = False
         # Lê mensagens em tempo real
+        mean = [0,0,0,0,0,0,0,0,0,0]  # Inicializa a lista com 10 zeros
+        
         for line in iter(process.stdout.readline, ""):
-            acc = f"{line.strip()}"
-            acc = acc.split(",")
-
-            new_data = pd.DataFrame([{'Ax1': float(acc[0]), 'Ay1': float(acc[1]), 'Az1': float(acc[2])}])
-
-            # Adicionando a nova linha ao DataFrame
-            signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True)
-            signal_mpu = signal_mpu.drop(index=0).reset_index(drop=True)
-
-            count += 1  
+            acc = line.strip().split(",")
+            new_data = pd.DataFrame([{'Ax1': float(acc[1]), 'Ay1': float(acc[2]), 'Az1': float(acc[3])}])
             
-            if count < 6:
-              pred = pipeline.predict(signal_mpu)
-              print(np.argmax(pred[0]))
-              res = np.argmax(pred[0])
-              count = 0
+            signal_mpu = pd.concat([signal_mpu, new_data], ignore_index=True).iloc[1:].reset_index(drop=True)
+            pred = pipeline.predict(signal_mpu)
+            res = np.argmax(pred[0])
+            
+            mean.pop(0)  # Remove o primeiro elemento
+            mean.append(res)  # Adiciona o novo resultado no final
+            
+            most_common_value, _ = Counter(mean).most_common(1)[0]  # Encontra o valor mais frequente
+            
+            print(res)
 
-              subprocess.run(["mosquitto_pub", "-h", "172.167.200.134", "-t", "/mov", "-m", f"{res}"])
+            print(most_common_value)
+
+            if most_common_value == 2:  # Se o valor mais frequente for 2, publica a mensagem
+                subprocess.run(["mosquitto_pub", "-h", broker, "-t", "/mov", "-m", "2"])
+                signal_mpu = stand_baseline.copy()
+                mean = [0,0,0,0,0,0,0,0,0,0]
+            
+            if most_common_value == 3:  # Se o valor mais frequente for 2, publica a mensagem
+                subprocess.run(["mosquitto_pub", "-h", broker, "-t", "/mov", "-m", "3"])
+                signal_mpu = stand_baseline.copy()
+                mean = [0,0,0,0,0,0,0,0,0,0]
+            
+
+            #count += 1
+
+
 
             # print(count)
 
-            # signal_mpu = stand_baseline
+            #signal_mpu = stand_baseline
 
     except KeyboardInterrupt:
         print("\nEncerrando monitoramento...")

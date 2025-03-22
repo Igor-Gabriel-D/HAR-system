@@ -6,7 +6,7 @@ import pandas as pd
 # Função para enviar os dados via mosquitto_pub
 def publish_data(broker, topic):
     try:
-        df = pd.read_csv('baseline_jump.csv')
+        df = pd.read_csv('jump_baseline.csv')
         df = df[['Ax1', 'Ay1', 'Az1']]
 
         # print(df)
